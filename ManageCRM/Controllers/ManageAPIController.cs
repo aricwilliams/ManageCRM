@@ -10,13 +10,17 @@ namespace ManageCRM.Controllers
     public class ManageAPIController : ControllerBase
     {
         [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<IEnumerable<CustomerDTO>> GetCustomers()
         {
             return Ok(CustomerStore.CustomerList);
         }
 
 
-        [HttpGet("id")]
+        [HttpGet("{id:int}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public ActionResult<CustomerDTO> GetCustomer(int id)
         {
             if(id == 0)
@@ -30,6 +34,26 @@ namespace ManageCRM.Controllers
             }
 
             return Ok(customer);
+        }
+
+        [HttpPost]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public ActionResult<CustomerDTO> CreateCustomer([FromBody] CustomerDTO customerDTO)
+        {
+            if (customerDTO == null)
+            {
+                return BadRequest(customerDTO);
+            }
+            if (customerDTO.Id > 0)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
+            customerDTO.Id = CustomerStore.CustomerList.OrderByDescending(u => u.Id).FirstOrDefault().Id + 1;
+            CustomerStore.CustomerList.Add(customerDTO);
+
+            return Ok(customerDTO);
         }
     }
 }
