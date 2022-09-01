@@ -2,6 +2,7 @@
 using ManageCRM.Models;
 using ManageCRM.Models.DTO;
 using ManageCRM.Data;
+using Microsoft.AspNetCore.JsonPatch;
 
 namespace ManageCRM.Controllers
 {
@@ -17,7 +18,7 @@ namespace ManageCRM.Controllers
         }
 
 
-        [HttpGet("{id:int}")]
+        [HttpGet("{id:int}", Name = "GetCustomer")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -37,11 +38,16 @@ namespace ManageCRM.Controllers
         }
 
         [HttpPost]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public ActionResult<CustomerDTO> CreateCustomer([FromBody] CustomerDTO customerDTO)
         {
+            if(CustomerStore.CustomerList.FirstOrDefault(u => u.Name.ToLower() == customerDTO.Name.ToLower()) != null)
+            {
+                ModelState.AddModelError("CustomErrorMessage", "Customer already exists!");
+                return BadRequest(ModelState);
+            }
             if (customerDTO == null)
             {
                 return BadRequest(customerDTO);
@@ -53,10 +59,71 @@ namespace ManageCRM.Controllers
             customerDTO.Id = CustomerStore.CustomerList.OrderByDescending(u => u.Id).FirstOrDefault().Id + 1;
             CustomerStore.CustomerList.Add(customerDTO);
 
-            return Ok(customerDTO);
+            return CreatedAtRoute("GetCustomer", new {id = customerDTO.Id },customerDTO);
+        }
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [HttpDelete("{id:int}", Name = "DeleteCustomer")]
+        public IActionResult DeleteCustomer(int id)
+        {
+            if (id == 0)
+            {
+                return BadRequest();    
+            }
+            var customer = CustomerStore.CustomerList.FirstOrDefault(u => u.Id == id);
+            if (customer == null)
+            {
+                return NotFound();
+            }
+            CustomerStore.CustomerList.Remove(customer);
+            return NoContent(); 
+        }
+
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [HttpPut("{id:int}", Name = "UpdateCustomer")]
+        public IActionResult UpdateCustomer(int id, [FromBody]CustomerDTO customerDTO)
+        {
+            if (customerDTO == null || id !=customerDTO.Id)
+            {
+                return BadRequest();
+            }
+            var customer = CustomerStore.CustomerList.FirstOrDefault(u => u.Id == id);
+            customer.Name = customerDTO.Name;
+            customer.Address = customerDTO.Address;
+            customer.Notes = customerDTO.Notes;
+
+            return NoContent();
+        }
+
+        [HttpPatch("{id:int}", Name = "UpdatePartialCustomer")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult UpdatePartialCustomer(int id, JsonPatchDocument<CustomerDTO> patchDTO)
+        {
+            if (patchDTO == null || id == 0)
+            {
+                return BadRequest();
+            }
+            var customer = CustomerStore.CustomerList.FirstOrDefault(u => u.Id == id);
+
+            if (customer == null)
+            {
+                return BadRequest();
+            }
+            patchDTO.ApplyTo(customer, ModelState);
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            return NoContent();
         }
     }
 }
 
 //link operation, where on the list we want the 1st or default where id == id we passed in param
 //return type is action rsult 200 for sucess request
+
+//now give the url where the resoucre is create when the user creates the object, "give me the id"
