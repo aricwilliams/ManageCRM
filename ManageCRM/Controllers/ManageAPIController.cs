@@ -8,12 +8,21 @@ namespace ManageCRM.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ManageAPIController : ControllerBase
+    public class CustomerAPIController : ControllerBase
     {
+        private readonly ILogger<CustomerAPIController> _logger;
+
+        public CustomerAPIController(ILogger<CustomerAPIController> logger)
+        {
+            _logger = logger;
+        }
+
+
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<IEnumerable<CustomerDTO>> GetCustomers()
         {
+            _logger.LogInformation("Gett all customers");
             return Ok(CustomerStore.CustomerList);
         }
 
@@ -26,6 +35,7 @@ namespace ManageCRM.Controllers
         {
             if(id == 0)
             {
+                _logger.LogError(" Get customer Error with Id" + id);
                 return BadRequest();
             }
             var customer = CustomerStore.CustomerList.FirstOrDefault(u => u.Id == id);

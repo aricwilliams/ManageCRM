@@ -9,6 +9,8 @@ namespace ManageCRM.Models.DTO
         [Required]
         [MaxLength(225)]
         public string Name { get; set; }
+        [Required]
+        public int Phone { get; set; }
         public string Address { get; set; }
         public string Notes { get; set; }
     }
