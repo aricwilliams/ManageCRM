@@ -6,10 +6,12 @@ using Microsoft.AspNetCore.JsonPatch;
 
 namespace ManageCRM.Controllers
 {
+    //this route parameter is here so if controller name is changed, still works
     [Route("api/[controller]")]
     [ApiController]
     public class CustomerAPIController : ControllerBase
     {
+        //used logger to get details in log file, see log file
         private readonly ILogger<CustomerAPIController> _logger;
 
         public CustomerAPIController(ILogger<CustomerAPIController> logger)
@@ -20,6 +22,7 @@ namespace ManageCRM.Controllers
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        //IEnumerable bc i am returning list of customers
         public ActionResult<IEnumerable<CustomerDTO>> GetCustomers()
         {
             _logger.LogInformation("Gett all customers");
@@ -66,6 +69,10 @@ namespace ManageCRM.Controllers
             {
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
+
+            //this next line is temporary store of data objects, this err line will remain until
+            //i hook up the database.
+            //this was done bc it's easier to get the API details done 1st
             customerDTO.Id = CustomerStore.CustomerList.OrderByDescending(u => u.Id).FirstOrDefault().Id + 1;
             CustomerStore.CustomerList.Add(customerDTO);
 
