@@ -32,7 +32,9 @@ namespace ManageCRM.Controllers
         public async Task<ActionResult<IEnumerable<CustomerDTO>>> GetCustomers()
         {
             _logger.LogInformation("Gett all customers");
-            return Ok(await _db.Customers.ToListAsync());
+            IEnumerable<Customer> customerList = await _db.Customers.ToListAsync();
+            //use mapper functon, then pass CustomerDTO as destination then the onject
+            return Ok(_mapper.Map<List<CustomerDTO>>(customerList));
         }
 
 
@@ -53,37 +55,39 @@ namespace ManageCRM.Controllers
                 return NotFound();
             }
 
-            return Ok(customer);
+            return Ok(_mapper.Map<CustomerDTO>(customer));
         }
 
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task< ActionResult<CustomerDTO>> CreateCustomer([FromBody] CustomerCreateDTO customerDTO)
+        public async Task< ActionResult<CustomerDTO>> CreateCustomer([FromBody] CustomerCreateDTO createDTO)
         {
-            if( await _db.Customers.FirstOrDefaultAsync(u => u.Name.ToLower() == customerDTO.Name.ToLower()) != null)
+            if( await _db.Customers.FirstOrDefaultAsync(u => u.Name.ToLower() == createDTO.Name.ToLower()) != null)
             {
                 ModelState.AddModelError("CustomErrorMessage", "Customer already exists!");
                 return BadRequest(ModelState);
             }
-            if (customerDTO == null)
+            if (createDTO == null)
             {
-                return BadRequest(customerDTO);
+                return BadRequest(createDTO);
             }
            
+            //this next one line will replace lines below, output is Customer, input is createDTO
+            Customer model = _mapper.Map<Customer>(createDTO);
             //manual conversion
             //Customers expects Customers, cannot implicitly convert customerDTO into Customer
             //mapping the properties
-            Customer model = new()
-            {
-                Name = customerDTO.Name,
-                Email = customerDTO.Email,
-                Phone = customerDTO.Phone,
-                Address = customerDTO.Address,
-                Notes = customerDTO.Notes
+            //Customer model = new()
+            //{
+            //    Name = createDTO.Name,
+            //    Email = createDTO.Email,
+            //    Phone = createDTO.Phone,
+            //    Address = createDTO.Address,
+            //    Notes = createDTO.Notes
 
-            };
+            //};
            await _db.Customers.AddAsync(model);
            await _db.SaveChangesAsync();  
             //EF will keep track of the customer id inside model
@@ -113,24 +117,27 @@ namespace ManageCRM.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [HttpPut("{id:int}", Name = "UpdateCustomer")]
-        public async Task<IActionResult> UpdateCustomer(int id, [FromBody]CustomerUpdateDTO customerDTO)
+        public async Task<IActionResult> UpdateCustomer(int id, [FromBody]CustomerUpdateDTO updateDTO)
         {
-            if (customerDTO == null || id !=customerDTO.Id)
+            if (updateDTO == null || id != updateDTO.Id)
             {
                 return BadRequest();
             }
+
+            Customer model = _mapper.Map<Customer>(updateDTO);
+
             //before we retreve the customer from the db, then update each one. EF Core will figure wich record to
             //update 
-            Customer model = new()
-            {
-                Id = customerDTO.Id,
-                Name = customerDTO.Name,
-                Email = customerDTO.Email,
-                Phone = customerDTO.Phone,
-                Address = customerDTO.Address,
-                Notes = customerDTO.Notes
+            //Customer model = new()
+            //{
+            //    Id = updateDTO.Id,
+            //    Name = updateDTO.Name,
+            //    Email = updateDTO.Email,
+            //    Phone = updateDTO.Phone,
+            //    Address = updateDTO.Address,
+            //    Notes = updateDTO.Notes
 
-            };
+            //};
             _db.Customers.Update(model);
             await _db.SaveChangesAsync();
 
@@ -152,16 +159,18 @@ namespace ManageCRM.Controllers
             //we only getting part of what needs to be updated 
             //convert customer to CustomerDTO
             //now we update to CustomerUpdateDTO, apply patch, update to Customer 
-            CustomerUpdateDTO customerDTO = new()
-            {
-                Id = customer.Id,
-                Name = customer.Name,
-                Email = customer.Email,
-                Phone = customer.Phone,
-                Address = customer.Address,
-                Notes = customer.Notes
+            //CustomerUpdateDTO customerDTO = new()
+            //{
+            //    Id = customer.Id,
+            //    Name = customer.Name,
+            //    Email = customer.Email,
+            //    Phone = customer.Phone,
+            //    Address = customer.Address,
+            //    Notes = customer.Notes
 
-            };
+            //};
+
+            CustomerUpdateDTO customerDTO = _mapper.Map<CustomerUpdateDTO>(customer);
 
             if (customer == null)
             {
@@ -173,16 +182,20 @@ namespace ManageCRM.Controllers
             //next we update the record 
             //convert customerDTO back to customer
 
-            Customer model = new Customer()
-            {
-                Id = customerDTO.Id,
-                Name = customerDTO.Name,
-                Email = customerDTO.Email,
-                Phone = customerDTO.Phone,
-                Address = customerDTO.Address,
-                Notes = customerDTO.Notes
+            //Customer model = new Customer()
+            //{
+            //    Id = customerDTO.Id,
+            //    Name = customerDTO.Name,
+            //    Email = customerDTO.Email,
+            //    Phone = customerDTO.Phone,
+            //    Address = customerDTO.Address,
+            //    Notes = customerDTO.Notes
 
-            };
+            //};
+
+            Customer model = _mapper.Map<Customer>(customerDTO);
+
+
             _db.Customers.Update(model);
             await _db.SaveChangesAsync();
 
