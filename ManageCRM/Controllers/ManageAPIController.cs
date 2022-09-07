@@ -3,6 +3,7 @@ using ManageCRM.Models;
 using ManageCRM.Models.DTO;
 using ManageCRM.Data;
 using Microsoft.AspNetCore.JsonPatch;
+using Microsoft.EntityFrameworkCore;
 
 namespace ManageCRM.Controllers
 {
@@ -13,10 +14,12 @@ namespace ManageCRM.Controllers
     {
         //used logger to get details in log file, see log file
         private readonly ILogger<CustomerAPIController> _logger;
+        private readonly ApplicationDbContext _db; 
 
-        public CustomerAPIController(ILogger<CustomerAPIController> logger)
+        public CustomerAPIController(ILogger<CustomerAPIController> logger, ApplicationDbContext db)
         {
             _logger = logger;
+            _db = db;   
         }
 
 
@@ -26,7 +29,7 @@ namespace ManageCRM.Controllers
         public ActionResult<IEnumerable<CustomerDTO>> GetCustomers()
         {
             _logger.LogInformation("Gett all customers");
-            return Ok(CustomerStore.CustomerList);
+            return Ok(_db.Customers.ToList());
         }
 
 
@@ -41,7 +44,7 @@ namespace ManageCRM.Controllers
                 _logger.LogError(" Get customer Error with Id" + id);
                 return BadRequest();
             }
-            var customer = CustomerStore.CustomerList.FirstOrDefault(u => u.Id == id);
+            var customer = _db.Customers.FirstOrDefault(u => u.Id == id);
             if (customer == null)
             {
                 return NotFound();
@@ -56,7 +59,7 @@ namespace ManageCRM.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public ActionResult<CustomerDTO> CreateCustomer([FromBody] CustomerDTO customerDTO)
         {
-            if(CustomerStore.CustomerList.FirstOrDefault(u => u.Name.ToLower() == customerDTO.Name.ToLower()) != null)
+            if(_db.Customers.FirstOrDefault(u => u.Name.ToLower() == customerDTO.Name.ToLower()) != null)
             {
                 ModelState.AddModelError("CustomErrorMessage", "Customer already exists!");
                 return BadRequest(ModelState);
@@ -69,12 +72,21 @@ namespace ManageCRM.Controllers
             {
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
+            //manual conversion
+            //Customers expects Customers, cannot implicitly convert customerDTO into Customer
+            //mapping the properties
+            Customer model = new()
+            {
+                Id = customerDTO.Id,
+                Name = customerDTO.Name,
+                Email = customerDTO.Email,
+                Phone = customerDTO.Phone,
+                Address = customerDTO.Address,
+                Notes = customerDTO.Notes
 
-            //this next line is temporary store of data objects, this err line will remain until
-            //i hook up the database.
-            //this was done bc it's easier to get the API details done 1st
-            customerDTO.Id = CustomerStore.CustomerList.OrderByDescending(u => u.Id).FirstOrDefault().Id + 1;
-            CustomerStore.CustomerList.Add(customerDTO);
+            };
+            _db.Customers.Add(model);
+            _db.SaveChanges();  
 
             return CreatedAtRoute("GetCustomer", new {id = customerDTO.Id },customerDTO);
         }
@@ -88,12 +100,13 @@ namespace ManageCRM.Controllers
             {
                 return BadRequest();    
             }
-            var customer = CustomerStore.CustomerList.FirstOrDefault(u => u.Id == id);
+            var customer = _db.Customers.FirstOrDefault(u => u.Id == id);
             if (customer == null)
             {
                 return NotFound();
             }
-            CustomerStore.CustomerList.Remove(customer);
+            _db.Customers.Remove(customer);
+            _db.SaveChanges();
             return NoContent(); 
         }
 
@@ -106,10 +119,20 @@ namespace ManageCRM.Controllers
             {
                 return BadRequest();
             }
-            var customer = CustomerStore.CustomerList.FirstOrDefault(u => u.Id == id);
-            customer.Name = customerDTO.Name;
-            customer.Address = customerDTO.Address;
-            customer.Notes = customerDTO.Notes;
+            //before we retreve the customer from the db, then update each one. EF Core will figure wich record to
+            //update 
+            Customer model = new()
+            {
+                Id = customerDTO.Id,
+                Name = customerDTO.Name,
+                Email = customerDTO.Email,
+                Phone = customerDTO.Phone,
+                Address = customerDTO.Address,
+                Notes = customerDTO.Notes
+
+            };
+            _db.Customers.Update(model);
+            _db.SaveChanges();
 
             return NoContent();
         }
@@ -123,13 +146,44 @@ namespace ManageCRM.Controllers
             {
                 return BadRequest();
             }
-            var customer = CustomerStore.CustomerList.FirstOrDefault(u => u.Id == id);
+            //when we retrive a record EF is tracking this.. we dont want it to here, so AsNoTracking
+            //the customer object below, we are not making changes to that object, we are not saving
+            var customer = _db.Customers.AsNoTracking().FirstOrDefault(u => u.Id == id);
+            //we only getting part of what needs to be updated 
+            //convert customer to CustomerDTO
+            CustomerDTO customerDTO = new()
+            {
+                Id = customer.Id,
+                Name = customer.Name,
+                Email = customer.Email,
+                Phone = customer.Phone,
+                Address = customer.Address,
+                Notes = customer.Notes
+
+            };
 
             if (customer == null)
             {
                 return BadRequest();
             }
-            patchDTO.ApplyTo(customer, ModelState);
+            patchDTO.ApplyTo(customerDTO, ModelState);
+            //Any changes we have in PatchDTO that is of type CustomerDTO, that will be applied 
+            //to customerDTO , the local variable customerDTO
+            //next we update the record 
+            //convert customerDTO back to customer
+
+            Customer model = new Customer()
+            {
+                Id = customerDTO.Id,
+                Name = customerDTO.Name,
+                Email = customerDTO.Email,
+                Phone = customerDTO.Phone,
+                Address = customerDTO.Address,
+                Notes = customerDTO.Notes
+
+            };
+            _db.Customers.Update(model);
+            _db.SaveChanges();
 
             if (!ModelState.IsValid)
             {
