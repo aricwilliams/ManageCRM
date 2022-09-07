@@ -4,6 +4,7 @@ using ManageCRM.Models.DTO;
 using ManageCRM.Data;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.EntityFrameworkCore;
+using AutoMapper;
 
 namespace ManageCRM.Controllers
 {
@@ -14,22 +15,24 @@ namespace ManageCRM.Controllers
     {
         //used logger to get details in log file, see log file
         private readonly ILogger<CustomerAPIController> _logger;
-        private readonly ApplicationDbContext _db; 
+        private readonly ApplicationDbContext _db;
+        private readonly IMapper _mapper;
 
-        public CustomerAPIController(ILogger<CustomerAPIController> logger, ApplicationDbContext db)
+        public CustomerAPIController(ILogger<CustomerAPIController> logger, ApplicationDbContext db, IMapper mapper)
         {
             _logger = logger;
             _db = db;   
+            _mapper = mapper;   
         }
 
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
         //IEnumerable bc i am returning list of customers
-        public ActionResult<IEnumerable<CustomerDTO>> GetCustomers()
+        public async Task<ActionResult<IEnumerable<CustomerDTO>>> GetCustomers()
         {
             _logger.LogInformation("Gett all customers");
-            return Ok(_db.Customers.ToList());
+            return Ok(await _db.Customers.ToListAsync());
         }
 
 
@@ -37,14 +40,14 @@ namespace ManageCRM.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<CustomerDTO> GetCustomer(int id)
+        public async Task<ActionResult<CustomerDTO>> GetCustomer(int id)
         {
             if(id == 0)
             {
                 _logger.LogError(" Get customer Error with Id" + id);
                 return BadRequest();
             }
-            var customer = _db.Customers.FirstOrDefault(u => u.Id == id);
+            var customer = await _db.Customers.FirstOrDefaultAsync(u => u.Id == id);
             if (customer == null)
             {
                 return NotFound();
@@ -57,9 +60,9 @@ namespace ManageCRM.Controllers
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<CustomerDTO> CreateCustomer([FromBody] CustomerDTO customerDTO)
+        public async Task< ActionResult<CustomerDTO>> CreateCustomer([FromBody] CustomerCreateDTO customerDTO)
         {
-            if(_db.Customers.FirstOrDefault(u => u.Name.ToLower() == customerDTO.Name.ToLower()) != null)
+            if( await _db.Customers.FirstOrDefaultAsync(u => u.Name.ToLower() == customerDTO.Name.ToLower()) != null)
             {
                 ModelState.AddModelError("CustomErrorMessage", "Customer already exists!");
                 return BadRequest(ModelState);
@@ -68,16 +71,12 @@ namespace ManageCRM.Controllers
             {
                 return BadRequest(customerDTO);
             }
-            if (customerDTO.Id > 0)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError);
-            }
+           
             //manual conversion
             //Customers expects Customers, cannot implicitly convert customerDTO into Customer
             //mapping the properties
             Customer model = new()
             {
-                Id = customerDTO.Id,
                 Name = customerDTO.Name,
                 Email = customerDTO.Email,
                 Phone = customerDTO.Phone,
@@ -85,35 +84,36 @@ namespace ManageCRM.Controllers
                 Notes = customerDTO.Notes
 
             };
-            _db.Customers.Add(model);
-            _db.SaveChanges();  
-
-            return CreatedAtRoute("GetCustomer", new {id = customerDTO.Id },customerDTO);
+           await _db.Customers.AddAsync(model);
+           await _db.SaveChangesAsync();  
+            //EF will keep track of the customer id inside model
+            //now we return the model
+            return CreatedAtRoute("GetCustomer", new {id = model.Id },model);
         }
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [HttpDelete("{id:int}", Name = "DeleteCustomer")]
-        public IActionResult DeleteCustomer(int id)
+        public async Task< IActionResult> DeleteCustomer(int id)
         {
             if (id == 0)
             {
                 return BadRequest();    
             }
-            var customer = _db.Customers.FirstOrDefault(u => u.Id == id);
+            var customer = await _db.Customers.FirstOrDefaultAsync(u => u.Id == id);
             if (customer == null)
             {
                 return NotFound();
             }
             _db.Customers.Remove(customer);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
             return NoContent(); 
         }
 
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [HttpPut("{id:int}", Name = "UpdateCustomer")]
-        public IActionResult UpdateCustomer(int id, [FromBody]CustomerDTO customerDTO)
+        public async Task<IActionResult> UpdateCustomer(int id, [FromBody]CustomerUpdateDTO customerDTO)
         {
             if (customerDTO == null || id !=customerDTO.Id)
             {
@@ -132,7 +132,7 @@ namespace ManageCRM.Controllers
 
             };
             _db.Customers.Update(model);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             return NoContent();
         }
@@ -140,7 +140,7 @@ namespace ManageCRM.Controllers
         [HttpPatch("{id:int}", Name = "UpdatePartialCustomer")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult UpdatePartialCustomer(int id, JsonPatchDocument<CustomerDTO> patchDTO)
+        public async Task<IActionResult> UpdatePartialCustomer(int id, JsonPatchDocument<CustomerUpdateDTO> patchDTO)
         {
             if (patchDTO == null || id == 0)
             {
@@ -148,10 +148,11 @@ namespace ManageCRM.Controllers
             }
             //when we retrive a record EF is tracking this.. we dont want it to here, so AsNoTracking
             //the customer object below, we are not making changes to that object, we are not saving
-            var customer = _db.Customers.AsNoTracking().FirstOrDefault(u => u.Id == id);
+            var customer = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);
             //we only getting part of what needs to be updated 
             //convert customer to CustomerDTO
-            CustomerDTO customerDTO = new()
+            //now we update to CustomerUpdateDTO, apply patch, update to Customer 
+            CustomerUpdateDTO customerDTO = new()
             {
                 Id = customer.Id,
                 Name = customer.Name,
@@ -183,7 +184,7 @@ namespace ManageCRM.Controllers
 
             };
             _db.Customers.Update(model);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             if (!ModelState.IsValid)
             {

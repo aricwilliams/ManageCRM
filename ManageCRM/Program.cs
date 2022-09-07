@@ -1,3 +1,4 @@
+using ManageCRM;
 using ManageCRM.Data;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -10,6 +11,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(option =>
 {
     option.UseSqlServer(builder.Configuration.GetConnectionString("DefaultSQLConnection"));
 });
+builder.Services.AddAutoMapper(typeof(MappingConfig));  
+
+
 Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().WriteTo.File("log/Customerlogs.txt", rollingInterval: RollingInterval.Day).CreateLogger();
 builder.Host.UseSerilog();
 builder.Services.AddControllers(option =>
