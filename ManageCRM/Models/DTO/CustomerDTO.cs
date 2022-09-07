@@ -17,3 +17,4 @@ namespace ManageCRM.Models.DTO
 }
 
 //data annotation we apply to model class, this will serve as validation
+//this object is for client to consume, we will extract data we dont want consumers to see

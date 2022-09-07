@@ -17,7 +17,8 @@ namespace ManageCRM.Models
         public string Notes { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime UpdatedDate { get; set; }   
-
+//In the future I will break this down more, will need to bring in diffrent parts of customer
+//I want customer to have jobs,pay rates,foreman...each customer will be a weekly/biweekly Job
 
     }
 }
